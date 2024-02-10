@@ -56,7 +56,6 @@ export const addTodo = async (text: string, uid: string) => {
         complete: false,
         createdAt: serverTimestamp()
     });
-
 }
 
 export const updateTodo = (id: string, newStatus: boolean) => {
