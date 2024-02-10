@@ -38,7 +38,7 @@ npm run dev
 ___
 
 Read more at Code.Build:  
-[Firestore Cloud Functions Counter](https://code.build/)
+- [Firestore Cloud Functions Counter](https://code.build/)
 
 
 
