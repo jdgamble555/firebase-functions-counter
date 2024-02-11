@@ -5,35 +5,36 @@ export const transactionCounter = (snap: QueryDocumentSnapshot) => {
 
     const db = snap.ref.firestore;
 
-    const collection = 'todos';
+    // get the collection name
+    const collection = snap.ref.path.split('/')[0];
 
     return db.runTransaction(async (transaction) => {
 
-        // get todo uid
-        const todoData = snap.data();
-        const uid = todoData.uid;
+        // get doc uid
+        const docData = snap.data();
+        const uid = docData.uid;
 
-        // get current todo collection count
-        const todoCountQuery = db.collection(collection).count();
-        const todoCountDoc = await transaction.get(todoCountQuery);
+        // get current doc collection count
+        const docCountQuery = db.collection(collection).count();
+        const docCountDoc = await transaction.get(docCountQuery);
 
-        // get current user todo count
+        // get current user doc count
         const userCountQuery = db
             .collection(collection)
             .where('uid', '==', uid)
             .count();
         const userCountDoc = await transaction.get(userCountQuery);
 
-        // update todo count
+        // update doc count
         const countRef = db.doc(`_counters/${collection}`);
         transaction.set(countRef, {
-            count: todoCountDoc.data().count
+            count: docCountDoc.data().count
         }, { merge: true });
 
-        // update user todo count
+        // update user doc count
         const userRef = db.doc('users/' + uid);
         transaction.set(userRef, {
-            todoCount: userCountDoc.data().count
+            [collection + 'Count']: userCountDoc.data().count
         }, { merge: true });
 
     });
@@ -47,7 +48,8 @@ export const eventCounter = async (
     const db = snap.ref.firestore;
     const eventId = context.eventId;
 
-    const collection = 'todos';
+    // get the collection name
+    const collection = snap.ref.path.split('/')[0];
 
     // check for event id
     const eventRef = db.doc(`_events/${eventId}`);
@@ -71,12 +73,12 @@ export const eventCounter = async (
     }, { merge: true });
 
     // user counter
-    const todoData = snap.data();
-    const uid = todoData.uid;
+    const docData = snap.data();
+    const uid = docData.uid;
     const userRef = db.doc('users/' + uid);
 
     batch.set(userRef, {
-        todoCount: FieldValue.increment(i)
+        [collection + 'Count']: FieldValue.increment(i)
     }, { merge: true });
 
     // add event

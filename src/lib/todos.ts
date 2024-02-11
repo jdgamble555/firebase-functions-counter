@@ -42,7 +42,7 @@ export const getTotalTodos = () => writable<number>(0, (set: Subscriber<number>)
 export const getTotalUserTodos = (uid: string) => writable<number>(0, (set: Subscriber<number>) =>
     onSnapshot(
         doc(db, `users/${uid}`),
-        (q) => set(q.exists() ? q.data().todoCount : 0)
+        (q) => set(q.exists() ? q.data().todosCount : 0)
     )
 );
 
