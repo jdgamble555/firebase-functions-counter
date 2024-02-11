@@ -51,54 +51,55 @@ export const eventCounter = async (
     // get the collection name
     const collection = snap.ref.path.split('/')[0];
 
-    // check for event id
-    const eventRef = db.doc(`_events/${eventId}`);
-    const eventDoc = await eventRef.get();
-
-    // do nothing, increment already ran
-    if (eventDoc.exists) {
-        return null;
-    }
-
-    const countRef = db.doc(`_counters/${collection}`);
-    const batch = db.batch();
-
-    // setup increment or decrement
-    const create = 'google.firestore.document.create';
-    const i = context.eventType === create ? 1 : -1;
-
-    // collection counter
-    batch.set(countRef, {
-        count: FieldValue.increment(i)
-    }, { merge: true });
-
-    // user counter
-    const docData = snap.data();
-    const uid = docData.uid;
-    const userRef = db.doc('users/' + uid);
-
-    batch.set(userRef, {
-        [collection + 'Count']: FieldValue.increment(i)
-    }, { merge: true });
-
-    // add event
-    batch.set(eventRef, {
-        'type': context.eventType,
-        'createdAt': FieldValue.serverTimestamp(),
-        'documentRef': snap.ref
-    });
-
-    // remove all old events
+    // get all expired events
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     const oldEventDocs = await db.collection('_events')
         .where('createdAt', '<=', tenMinutesAgo)
         .get();
 
-    if (!oldEventDocs.empty) {
-        oldEventDocs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-    }
+    return db.runTransaction(async (transaction) => {
 
-    return batch.commit();
+        // check for event id
+        const eventRef = db.doc(`_events/${eventId}`);
+        const eventDoc = await transaction.get(eventRef);
+
+        // remove old events
+        if (!oldEventDocs.empty) {
+            oldEventDocs.forEach(doc => {
+                transaction.delete(doc.ref);
+            });
+        }
+
+        // do nothing, increment already ran
+        if (eventDoc.exists) {
+            return null;
+        }
+
+        const countRef = db.doc(`_counters/${collection}`);
+
+        // setup increment or decrement
+        const create = 'google.firestore.document.create';
+        const i = context.eventType === create ? 1 : -1;
+
+        transaction.set(countRef, {
+            count: FieldValue.increment(i)
+        }, { merge: true });
+
+        // user counter
+        const docData = snap.data();
+        const uid = docData.uid;
+        const userRef = db.doc('users/' + uid);
+
+        transaction.set(userRef, {
+            [collection + 'Count']: FieldValue.increment(i)
+        }, { merge: true });
+
+        // add event
+        return transaction.set(eventRef, {
+            'type': context.eventType,
+            'createdAt': FieldValue.serverTimestamp(),
+            'documentRef': snap.ref
+        });
+        
+    });
 }
