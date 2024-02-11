@@ -100,6 +100,6 @@ export const eventCounter = async (
             'createdAt': FieldValue.serverTimestamp(),
             'documentRef': snap.ref
         });
-        
+
     });
 }
