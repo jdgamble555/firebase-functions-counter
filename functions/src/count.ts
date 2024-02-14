@@ -1,17 +1,44 @@
-import { FieldValue, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { DocumentReference, FieldValue, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import type { EventContext } from 'firebase-functions';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 
+type DocEvent = Parameters<typeof onDocumentCreated>[1];
+
+// V1
 export const transactionCounter = (snap: QueryDocumentSnapshot) => {
 
     const db = snap.ref.firestore;
-
-    // get the collection name
     const collection = snap.ref.path.split('/')[0];
+    const docData = snap.data();
 
+    return sharedTransaction(db, collection, docData);
+}
+
+// V2
+export const transactionCounterV2: DocEvent = (event) => {
+
+    const data = event.data;
+
+    if (!data) {
+        return;
+    }
+
+    const db = data.ref.firestore;
+    const collection = event.document.split('/')[0];
+    const docData = data.data();
+
+    return sharedTransaction(db, collection, docData);
+};
+
+// shared transaction
+const sharedTransaction = (
+    db: FirebaseFirestore.Firestore,
+    collection: string,
+    docData: FirebaseFirestore.DocumentData
+) => {
     return db.runTransaction(async (transaction) => {
 
         // get doc uid
-        const docData = snap.data();
         const uid = docData.uid;
 
         // get current doc collection count
@@ -40,6 +67,7 @@ export const transactionCounter = (snap: QueryDocumentSnapshot) => {
     });
 }
 
+// V1
 export const eventCounter = async (
     snap: QueryDocumentSnapshot,
     context: EventContext
@@ -47,10 +75,22 @@ export const eventCounter = async (
 
     const db = snap.ref.firestore;
     const eventId = context.eventId;
-
-    // get the collection name
+    const eventType = context.eventType;
+    const ref = snap.ref;
     const collection = snap.ref.path.split('/')[0];
+    const docData = snap.data();
 
+    return sharedEvent(db, eventId, eventType, collection, docData, ref);
+}
+
+const sharedEvent = async (
+    db: FirebaseFirestore.Firestore,
+    eventId: string,
+    eventType: string,
+    collection: string,
+    docData: FirebaseFirestore.DocumentData,
+    ref: DocumentReference
+) => {
     // get all expired events
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     const oldEventDocs = await db.collection('_events')
@@ -79,14 +119,13 @@ export const eventCounter = async (
 
         // setup increment or decrement
         const create = 'google.firestore.document.create';
-        const i = context.eventType === create ? 1 : -1;
+        const i = eventType === create ? 1 : -1;
 
         transaction.set(countRef, {
             count: FieldValue.increment(i)
         }, { merge: true });
 
         // user counter
-        const docData = snap.data();
         const uid = docData.uid;
         const userRef = db.doc('users/' + uid);
 
@@ -96,10 +135,28 @@ export const eventCounter = async (
 
         // add event
         return transaction.set(eventRef, {
-            'type': context.eventType,
+            'type': eventType,
             'createdAt': FieldValue.serverTimestamp(),
-            'documentRef': snap.ref
+            'documentRef': ref
         });
 
     });
+}
+
+export const eventCounterV2: DocEvent = async (event) => {
+
+    const data = event.data;
+
+    if (!data) {
+        return;
+    }
+
+    const db = data.ref.firestore;
+    const eventId = event.id;
+    const eventType = event.type;
+    const docData = data.data();
+    const collection = data.ref.path.split('/')[0];
+    const ref = data.ref;
+
+    return sharedEvent(db, eventId, eventType, collection, docData, ref);
 }
