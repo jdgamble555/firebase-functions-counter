@@ -83,6 +83,25 @@ export const eventCounter = async (
     return sharedEvent(db, eventId, eventType, collection, docData, ref);
 }
 
+// V2
+export const eventCounterV2: DocEvent = async (event) => {
+
+    const data = event.data;
+
+    if (!data) {
+        return;
+    }
+
+    const db = data.ref.firestore;
+    const eventId = event.id;
+    const eventType = event.type;
+    const docData = data.data();
+    const collection = data.ref.path.split('/')[0];
+    const ref = data.ref;
+
+    return sharedEvent(db, eventId, eventType, collection, docData, ref);
+}
+
 const sharedEvent = async (
     db: FirebaseFirestore.Firestore,
     eventId: string,
@@ -141,22 +160,4 @@ const sharedEvent = async (
         });
 
     });
-}
-
-export const eventCounterV2: DocEvent = async (event) => {
-
-    const data = event.data;
-
-    if (!data) {
-        return;
-    }
-
-    const db = data.ref.firestore;
-    const eventId = event.id;
-    const eventType = event.type;
-    const docData = data.data();
-    const collection = data.ref.path.split('/')[0];
-    const ref = data.ref;
-
-    return sharedEvent(db, eventId, eventType, collection, docData, ref);
 }
